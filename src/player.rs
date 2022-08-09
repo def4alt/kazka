@@ -68,27 +68,35 @@ fn player_move(
     mut transforms: Query<&mut Transform, With<PlayerCamera>>,
 ) {
     if let Some(window) = windows.get_primary() {
+        if !window.cursor_locked() {
+            return;
+        }
+
         if let Some(mut transform) = transforms.iter_mut().next() {
             let mut movement = Vec3::ZERO;
 
+            let local_x = transform.local_x();
+            let local_z = -transform.local_z();
+            let forward = Vec3::new(local_z.x, 0.0, local_z.z);
+            let right = Vec3::new(local_x.x, 0.0, local_x.z);
+            let up = Vec3::Y;
+
             for key in keyboard_input.get_pressed() {
-                if window.cursor_locked() {
-                    match key {
-                        KeyCode::A => movement.x -= 1.0,
-                        KeyCode::D => movement.x += 1.0,
-                        KeyCode::S => movement.y -= 1.0,
-                        KeyCode::W => movement.y += 1.0,
-                        _ => (),
-                    }
+                match key {
+                    KeyCode::A => movement -= right,
+                    KeyCode::D => movement += right,
+                    KeyCode::S => movement -= forward,
+                    KeyCode::W => movement += forward,
+                    KeyCode::LShift => movement -= up,
+                    KeyCode::Space => movement += up,
+                    _ => (),
                 }
             }
 
             movement = movement.normalize_or_zero();
-            movement *= settings.speed * time.delta().as_secs_f32();
+            movement *= settings.speed * time.delta_seconds();
 
-            let local_y = transform.local_y();
-            let local_x = transform.local_x();
-            transform.translation += local_x * movement.x + local_y * movement.y;
+            transform.translation += movement;
         }
     }
 }
