@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::event::ManualEventReader, input::mouse::MouseMotion, prelude::*};
 
 pub struct MovementSettings {
     pub sensitivity: f32,
@@ -14,6 +14,13 @@ impl Default for MovementSettings {
     }
 }
 
+#[derive(Default)]
+struct InputState {
+    pitch: f32,
+    yaw: f32,
+    reader_motion: ManualEventReader<MouseMotion>,
+}
+
 pub struct PlayerPlugin;
 
 #[derive(Component)]
@@ -21,10 +28,12 @@ pub struct PlayerCamera;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MovementSettings>()
+        app.init_resource::<InputState>()
+            .init_resource::<MovementSettings>()
             .add_startup_system(setup_player)
             .add_startup_system(startup_grab_cursor)
             .add_system(player_move)
+            .add_system(player_look)
             .add_system(cursor_grab);
     }
 }
@@ -81,6 +90,37 @@ fn player_move(
             let local_x = transform.local_x();
             transform.translation += local_x * movement.x + local_y * movement.y;
         }
+    }
+}
+
+fn player_look(
+    windows: Res<Windows>,
+    settings: Res<MovementSettings>,
+    motion: Res<Events<MouseMotion>>,
+    mut state: ResMut<InputState>,
+    mut transforms: Query<&mut Transform, With<PlayerCamera>>,
+) {
+    if let Some(window) = windows.get_primary() {
+        if !window.cursor_locked() {
+            return;
+        }
+
+        let mut delta_state = state.as_mut();
+        if let Some(mut transform) = transforms.iter_mut().next() {
+            for ev in delta_state.reader_motion.iter(&motion) {
+                let window_scale = window.height().min(window.width());
+                delta_state.pitch -=
+                    (settings.sensitivity * ev.delta.y * window_scale).to_radians();
+                delta_state.yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
+
+                delta_state.pitch = delta_state.pitch.clamp(-1.54, 1.54);
+
+                transform.rotation = Quat::from_axis_angle(Vec3::Y, delta_state.yaw)
+                    * Quat::from_axis_angle(Vec3::X, delta_state.pitch);
+            }
+        }
+    } else {
+        error!("Failed to get primary window at `player_look`")
     }
 }
 
