@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 
 mod game;
+mod player;
 
 use game::GamePlugin;
+use player::PlayerPlugin;
 
 fn main() {
     App::new()
@@ -13,6 +15,7 @@ fn main() {
             ..default()
         })
         .add_plugins(DefaultPlugins)
+        .add_plugin(PlayerPlugin)
         .add_plugin(GamePlugin)
         .run();
 }
