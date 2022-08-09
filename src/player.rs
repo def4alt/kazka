@@ -18,7 +18,6 @@ impl Default for MovementSettings {
 struct InputState {
     pitch: f32,
     yaw: f32,
-    reader_motion: ManualEventReader<MouseMotion>,
 }
 
 pub struct PlayerPlugin;
@@ -104,7 +103,7 @@ fn player_move(
 fn player_look(
     windows: Res<Windows>,
     settings: Res<MovementSettings>,
-    motion: Res<Events<MouseMotion>>,
+    mut motion: EventReader<MouseMotion>,
     mut state: ResMut<InputState>,
     mut transforms: Query<&mut Transform, With<PlayerCamera>>,
 ) {
@@ -115,7 +114,7 @@ fn player_look(
 
         let mut delta_state = state.as_mut();
         if let Some(mut transform) = transforms.iter_mut().next() {
-            for ev in delta_state.reader_motion.iter(&motion) {
+            for ev in motion.iter() {
                 let window_scale = window.height().min(window.width());
                 delta_state.pitch -=
                     (settings.sensitivity * ev.delta.y * window_scale).to_radians();
