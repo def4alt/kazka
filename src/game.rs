@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 pub struct GamePlugin;
 
@@ -13,18 +14,25 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
-        material: materials.add(Color::rgb(0.5, 0.3, 0.2).into()),
-        ..default()
-    });
+    commands
+        .spawn()
+        .insert(Collider::cuboid(2.5, 0.0001, 2.5))
+        .insert_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
+            material: materials.add(Color::rgb(0.5, 0.3, 0.2).into()),
+            ..default()
+        });
 
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material: materials.add(Color::rgb(0.3, 0.6, 0.1).into()),
-        transform: Transform::from_xyz(0.0, 0.5, 0.0),
-        ..default()
-    });
+    commands
+        .spawn()
+        .insert(RigidBody::Dynamic)
+        .insert(Collider::cuboid(1.0, 1.0, 1.0))
+        .insert_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 2.0 })),
+            material: materials.add(Color::rgb(0.3, 0.6, 0.1).into()),
+            transform: Transform::from_xyz(0.0, 3.0, 0.0),
+            ..default()
+        });
 
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {
