@@ -1,4 +1,4 @@
-use bevy::{ecs::event::ManualEventReader, input::mouse::MouseMotion, prelude::*};
+use bevy::{input::mouse::MouseMotion, prelude::*};
 
 pub struct MovementSettings {
     pub sensitivity: f32,
@@ -25,6 +25,9 @@ pub struct PlayerPlugin;
 #[derive(Component)]
 pub struct PlayerCamera;
 
+#[derive(Component)]
+pub struct PlayerBody;
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<InputState>()
@@ -37,13 +40,24 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn setup_player(mut commands: Commands) {
+fn setup_player(mut meshes: ResMut<Assets<Mesh>>, mut commands: Commands) {
     commands
-        .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Capsule {
+                radius: 0.5,
+                ..default()
+            })),
             ..default()
         })
-        .insert(PlayerCamera);
+        .insert(PlayerBody)
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(Camera3dBundle {
+                    transform: Transform::from_xyz(1.0, 1.5, 5.0),
+                    ..default()
+                })
+                .insert(PlayerCamera);
+        });
 }
 
 fn startup_grab_cursor(mut windows: ResMut<Windows>) {
@@ -60,43 +74,41 @@ fn toggle_grab_cursor(window: &mut Window) {
 }
 
 fn player_move(
+    windows: Res<Windows>,
     keyboard_input: Res<Input<KeyCode>>,
     settings: Res<MovementSettings>,
-    windows: Res<Windows>,
     time: Res<Time>,
-    mut transforms: Query<&mut Transform, With<PlayerCamera>>,
+    mut player_transforms: Query<&mut Transform, (With<PlayerBody>, Without<PlayerCamera>)>,
 ) {
     if let Some(window) = windows.get_primary() {
         if !window.cursor_locked() {
             return;
         }
+        let mut player_transform = player_transforms.single_mut();
+        let mut movement = Vec3::ZERO;
 
-        if let Some(mut transform) = transforms.iter_mut().next() {
-            let mut movement = Vec3::ZERO;
+        let local_x = player_transform.local_x();
+        let local_z = -player_transform.local_z();
+        let forward = Vec3::new(local_z.x, 0.0, local_z.z);
+        let right = Vec3::new(local_x.x, 0.0, local_x.z);
+        let up = Vec3::Y;
 
-            let local_x = transform.local_x();
-            let local_z = -transform.local_z();
-            let forward = Vec3::new(local_z.x, 0.0, local_z.z);
-            let right = Vec3::new(local_x.x, 0.0, local_x.z);
-            let up = Vec3::Y;
-
-            for key in keyboard_input.get_pressed() {
-                match key {
-                    KeyCode::A => movement -= right,
-                    KeyCode::D => movement += right,
-                    KeyCode::S => movement -= forward,
-                    KeyCode::W => movement += forward,
-                    KeyCode::LShift => movement -= up,
-                    KeyCode::Space => movement += up,
-                    _ => (),
-                }
+        for key in keyboard_input.get_pressed() {
+            match key {
+                KeyCode::A => movement -= right,
+                KeyCode::D => movement += right,
+                KeyCode::S => movement -= forward,
+                KeyCode::W => movement += forward,
+                KeyCode::LShift => movement -= up,
+                KeyCode::Space => movement += up,
+                _ => (),
             }
-
-            movement = movement.normalize_or_zero();
-            movement *= settings.speed * time.delta_seconds();
-
-            transform.translation += movement;
         }
+
+        movement = movement.normalize_or_zero();
+        movement *= settings.speed * time.delta_seconds();
+
+        player_transform.translation += movement;
     }
 }
 
@@ -105,7 +117,8 @@ fn player_look(
     settings: Res<MovementSettings>,
     mut motion: EventReader<MouseMotion>,
     mut state: ResMut<InputState>,
-    mut transforms: Query<&mut Transform, With<PlayerCamera>>,
+    mut camera_transforms: Query<&mut Transform, (With<PlayerCamera>, Without<PlayerBody>)>,
+    mut player_transforms: Query<&mut Transform, (With<PlayerBody>, Without<PlayerCamera>)>,
 ) {
     if let Some(window) = windows.get_primary() {
         if !window.cursor_locked() {
@@ -113,18 +126,18 @@ fn player_look(
         }
 
         let mut delta_state = state.as_mut();
-        if let Some(mut transform) = transforms.iter_mut().next() {
-            for ev in motion.iter() {
-                let window_scale = window.height().min(window.width());
-                delta_state.pitch -=
-                    (settings.sensitivity * ev.delta.y * window_scale).to_radians();
-                delta_state.yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
+        let mut camera_transform = camera_transforms.single_mut();
+        let mut player_transform = player_transforms.single_mut();
 
-                delta_state.pitch = delta_state.pitch.clamp(-1.54, 1.54);
+        for ev in motion.iter() {
+            let window_scale = window.height().min(window.width());
+            delta_state.pitch -= (settings.sensitivity * ev.delta.y * window_scale).to_radians();
+            delta_state.yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
 
-                transform.rotation = Quat::from_axis_angle(Vec3::Y, delta_state.yaw)
-                    * Quat::from_axis_angle(Vec3::X, delta_state.pitch);
-            }
+            delta_state.pitch = delta_state.pitch.clamp(-1.54, 1.54);
+
+            player_transform.rotation = Quat::from_axis_angle(Vec3::Y, delta_state.yaw);
+            camera_transform.rotation = Quat::from_axis_angle(Vec3::X, delta_state.pitch);
         }
     } else {
         error!("Failed to get primary window at `player_look`")
