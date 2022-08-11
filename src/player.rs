@@ -80,7 +80,7 @@ fn setup_player(
         .with_children(|parent| {
             parent
                 .spawn_bundle(Camera3dBundle {
-                    transform: Transform::from_xyz(1.0, 1.5, 5.0),
+                    transform: Transform::from_xyz(0.0, 0.7, 0.0),
                     ..default()
                 })
                 .insert(PlayerCamera);
