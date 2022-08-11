@@ -1,11 +1,13 @@
 use std::f32::consts::PI;
 
 use bevy::{input::mouse::MouseMotion, prelude::*};
-use bevy_rapier3d::prelude::*;
+use bevy_rapier3d::{na::ComplexField, prelude::*};
 
 pub struct MovementSettings {
     pub sensitivity: f32,
     pub speed: f32,
+    pub jump_height: f32,
+    pub mass: f32,
 }
 
 impl Default for MovementSettings {
@@ -13,6 +15,8 @@ impl Default for MovementSettings {
         Self {
             sensitivity: 0.00015,
             speed: 2.0,
+            jump_height: 5.0,
+            mass: 10.0,
         }
     }
 }
@@ -51,6 +55,12 @@ fn setup_player(
     commands
         .spawn()
         .insert(RigidBody::Dynamic)
+        .insert(ExternalImpulse {
+            ..Default::default()
+        })
+        .insert(Velocity {
+            ..Default::default()
+        })
         .insert(LockedAxes::ROTATION_LOCKED)
         .insert(Collider::capsule(
             Vec3::new(0.0, -0.5, 0.0),
@@ -96,12 +106,15 @@ fn player_move(
     settings: Res<MovementSettings>,
     time: Res<Time>,
     mut player_transforms: Query<&mut Transform, (With<PlayerBody>, Without<PlayerCamera>)>,
+    mut ext_impulses: Query<&mut ExternalImpulse, With<PlayerBody>>,
+    velocities: Query<&Velocity, With<PlayerBody>>,
 ) {
     if let Some(window) = windows.get_primary() {
         if !window.cursor_locked() {
             return;
         }
         let mut player_transform = player_transforms.single_mut();
+        let velocity = velocities.single();
         let mut movement = Vec3::ZERO;
 
         let local_x = player_transform.local_x();
@@ -116,11 +129,23 @@ fn player_move(
                 KeyCode::D => movement += right,
                 KeyCode::S => movement -= forward,
                 KeyCode::W => movement += forward,
-                KeyCode::LShift => movement -= up,
                 KeyCode::Space => movement += up,
                 _ => (),
             }
         }
+
+        if velocity.linvel.y < 0.001 && velocity.linvel.y > -0.001 {
+            for mut ext_impulse in ext_impulses.iter_mut() {
+                ext_impulse.impulse = movement.y
+                    * Vec3::new(
+                        0.0,
+                        ComplexField::sqrt(2.0 * 9.81 * settings.jump_height),
+                        0.0,
+                    );
+            }
+        }
+
+        movement.y = 0.0;
 
         movement = movement.normalize_or_zero();
         movement *= settings.speed * time.delta_seconds();
