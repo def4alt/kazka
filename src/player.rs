@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::{input::mouse::MouseMotion, prelude::*};
 
 pub struct MovementSettings {
@@ -134,7 +136,7 @@ fn player_look(
             delta_state.pitch -= (settings.sensitivity * ev.delta.y * window_scale).to_radians();
             delta_state.yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
 
-            delta_state.pitch = delta_state.pitch.clamp(-1.54, 1.54);
+            delta_state.pitch = delta_state.pitch.clamp(-PI / 4.0, PI / 4.0);
 
             player_transform.rotation = Quat::from_axis_angle(Vec3::Y, delta_state.yaw);
             camera_transform.rotation = Quat::from_axis_angle(Vec3::X, delta_state.pitch);
