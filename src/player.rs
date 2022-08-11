@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::{input::mouse::MouseMotion, prelude::*};
+use bevy_rapier3d::prelude::*;
 
 pub struct MovementSettings {
     pub sensitivity: f32,
@@ -42,13 +43,27 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn setup_player(mut meshes: ResMut<Assets<Mesh>>, mut commands: Commands) {
+fn setup_player(
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut commands: Commands,
+) {
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn()
+        .insert(RigidBody::Dynamic)
+        .insert(LockedAxes::ROTATION_LOCKED)
+        .insert(Collider::capsule(
+            Vec3::new(0.0, -0.5, 0.0),
+            Vec3::new(0.0, 0.5, 0.0),
+            0.5,
+        ))
+        .insert_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Capsule {
                 radius: 0.5,
-                ..default()
+                ..Default::default()
             })),
+            material: materials.add(Color::rgb(0.3, 0.6, 0.1).into()),
+            transform: Transform::from_xyz(0.0, 5.0, 0.0),
             ..default()
         })
         .insert(PlayerBody)
